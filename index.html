@@ -1,0 +1,1839 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Poker Tournament Timer</title>
+  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+  <!-- Excel操作ライブラリ (SheetJS) -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Anton&family=Bebas+Neue&family=Chakra+Petch:wght@700&family=Cinzel:wght@700&family=Fira+Code:wght@700&family=Graduate&family=Iceland&family=KouzanGoshikiosho&family=M+PLUS+1p:wght@800&family=M+PLUS+Rounded+1c:wght@800&family=Michroma&family=Montserrat:wght@800&family=Nico+Moji&family=Orbitron:wght@500;700;800;900&family=Oswald:wght@700&family=Permanent+Marker&family=Press+Start+2P&family=Rajdhani:wght@600;700&family=RFP&family=Righteous&family=Russo+One&family=Saira+Stencil+One&family=Share+Tech+Mono&family=Shippori+Mincho:wght@600;800&family=Space+Grotesk:wght@700&family=Teko:wght@600&family=VT323&family=Wallpoet&family=Yuji+Syuku&family=Zen+Dots&display=swap');
+
+    :root {
+      --bg-dark: #0a0d12;
+      --panel-bg: linear-gradient(145deg, rgba(25, 33, 44, 0.8), rgba(15, 20, 28, 0.9));
+      --panel-border: rgba(255, 255, 255, 0.08);
+      --cyan-glow: #14f3ff;
+      --cyan-dim: rgba(20, 243, 255, 0.25);
+      --glow-intensity: 0.1;
+      --gold-accent: #ffb703;
+      --text-sub: #7a8b9e;
+      --text-main: #f0f4f8;
+      --timer-text-color: #ffffff;
+      --btn-grad: linear-gradient(180deg, #323b48 0%, #1a202c 100%);
+      --btn-border: rgba(255, 255, 255, 0.15);
+      --timer-font: 'Shippori Mincho', serif;
+    }
+
+    * { box-sizing: border-box; user-select: none; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Shippori Mincho', serif;
+      background-color: var(--bg-dark);
+      background-image: 
+        radial-gradient(circle at 50% 40%, var(--cyan-dim) 0%, transparent 60%),
+        radial-gradient(circle at 50% 100%, rgba(0, 0, 0, 0.9) 0%, transparent 100%);
+      color: var(--text-main);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .timer-frame {
+      display: flex;
+      flex-direction: column;
+      width: 96vw;
+      height: 94vh;
+      padding: 2vh 2vw;
+      border-radius: 20px;
+      background: rgba(12, 16, 23, 0.95);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      box-shadow: 0 30px 60px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+      position: relative;
+      overflow: visible;
+    }
+
+    .top-section {
+      display: grid;
+      grid-template-columns: 32% 1fr 28%;
+      gap: 2vw;
+      align-items: center;
+      flex: 1;
+      min-height: 0;
+      overflow: visible;
+    }
+
+    .panel {
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 16px;
+      padding: 2.5vh 1.5vw;
+      box-shadow: 0 10px 20px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(10px);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      height: 70%;
+    }
+
+    .panel-header {
+      color: var(--text-sub);
+      font-size: min(1.2vw, 1.8vh);
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      margin-bottom: 2vh;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      padding-bottom: 0.8vh;
+    }
+
+    .item-group { margin-bottom: 2vh; }
+    .item-group:last-child { margin-bottom: 0; }
+
+    .item-value {
+      font-family: var(--timer-font);
+      color: var(--gold-accent);
+      font-size: min(1.6vw, 2.8vh);
+      font-weight: 700;
+      text-shadow: 0 0 calc(10px * var(--glow-intensity)) rgba(255, 183, 3, 0.3);
+      white-space: nowrap;
+      transition: color 0.2s ease;
+    }
+
+    .info-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1.5vh 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    }
+    .info-item:last-child { border-bottom: none; }
+
+    .info-label { color: var(--text-sub); font-size: min(1.3vw, 2vh); }
+    .info-value {
+      font-family: var(--timer-font);
+      color: var(--text-main);
+      font-size: min(1.4vw, 2.2vh);
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 0.3vw;
+    }
+
+    .timer-wrapper {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100%;
+      position: relative;
+      overflow: visible;
+    }
+
+    .timer-container {
+      width: min(38vw, 50vh);
+      height: min(38vw, 50vh);
+      position: relative;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow: visible;
+    }
+
+    .progress-ring {
+      width: 140%;
+      height: 140%;
+      position: absolute;
+      top: -20%;
+      left: -20%;
+      transform: rotate(-90deg);
+      overflow: visible;
+    }
+
+    .progress-ring__circle_bg { 
+      stroke: rgba(20, 30, 45, 0.6); 
+      stroke-width: 12; 
+      fill: none; 
+    }
+
+    .progress-ring__circle_bar {
+      stroke: var(--cyan-glow);
+      stroke-width: 12;
+      stroke-linecap: round;
+      fill: none;
+      transition: stroke-dashoffset 0.05s linear, stroke 0.3s ease;
+      filter: drop-shadow(0 0 calc(12px * var(--glow-intensity)) var(--cyan-glow));
+    }
+
+    .timer-inner { 
+      text-align: center; 
+      z-index: 2; 
+      overflow: visible;
+      padding: 20px;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #time-display, .preview-timer {
+      font-family: var(--timer-font);
+      font-weight: 800;
+      color: var(--timer-text-color);
+      margin: 0;
+      line-height: 1.1;
+      letter-spacing: 0;
+      font-variant-numeric: tabular-nums;
+      font-feature-settings: "tnum";
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      width: 100%;
+      white-space: nowrap;
+      transition: text-shadow 0.3s ease, color 0.2s ease;
+    }
+
+    #time-display {
+      font-size: min(7vw, 11vh);
+      text-shadow: 
+        0 0 calc(8px * var(--glow-intensity)) var(--cyan-glow),
+        0 0 calc(20px * var(--glow-intensity)) var(--cyan-glow),
+        0 0 calc(40px * var(--glow-intensity)) var(--cyan-glow);
+    }
+
+    .time-part {
+      width: 2.2em;
+      display: inline-block;
+      font-variant-numeric: tabular-nums;
+      font-feature-settings: "tnum";
+    }
+
+    .time-part.minutes {
+      text-align: right;
+    }
+
+    .time-part.seconds {
+      text-align: left;
+    }
+
+    .time-colon {
+      width: 0.5em;
+      text-align: center;
+      display: inline-block;
+      flex-shrink: 0;
+    }
+
+    #level-display {
+      font-family: var(--timer-font);
+      font-size: min(1.8vw, 2.8vh);
+      font-weight: 700;
+      color: var(--cyan-glow);
+      letter-spacing: 0.15em;
+      margin-top: 1vh;
+      text-shadow: 0 0 calc(8px * var(--glow-intensity)) var(--cyan-glow);
+      transition: color 0.3s ease, text-shadow 0.3s ease;
+    }
+
+    .bottom-section {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 1.2vw;
+      padding-top: 1vh;
+      height: 10%;
+    }
+
+    button {
+      font-family: 'Shippori Mincho', serif;
+      font-size: min(0.9vw, 1.6vh);
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      color: var(--text-main);
+      background: var(--btn-grad);
+      border: 1px solid var(--btn-border);
+      padding: 0 1.2vw;
+      border-radius: 10px;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: min(6vh, 48px);
+    }
+
+    button:hover {
+      background: linear-gradient(180deg, #3d4758 0%, #222938 100%);
+      border-color: rgba(255, 255, 255, 0.3);
+      transform: translateY(-2px);
+    }
+
+    /* メインボタンのサイズを固定設定 */
+    #start-stop-btn {
+      background: linear-gradient(180deg, #003844 0%, #001f26 100%);
+      border: 1px solid var(--cyan-glow);
+      color: var(--cyan-glow);
+      box-shadow: 0 0 calc(15px * var(--glow-intensity)) var(--cyan-dim);
+      width: min(16vw, 220px);
+      height: min(6.5vh, 52px);
+      padding: 0;
+      flex-shrink: 0;
+      transition: all 0.3s ease;
+    }
+
+    #start-stop-btn.running {
+      background: linear-gradient(180deg, #4a0d0d 0%, #260000 100%);
+      border-color: #ff4d4d;
+      color: #ff4d4d;
+    }
+
+    .view-only-mode .admin-only { display: none !important; }
+
+    .save-flash-notice {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0, 0, 0, 0.85);
+      border: 2px solid var(--cyan-glow);
+      color: var(--cyan-glow);
+      padding: 1rem 2rem;
+      border-radius: 12px;
+      font-family: 'Shippori Mincho', serif;
+      font-size: 1.2rem;
+      font-weight: bold;
+      letter-spacing: 0.1em;
+      box-shadow: 0 0 30px var(--cyan-glow);
+      z-index: 10;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0; width: 100vw; height: 100vh;
+      background: rgba(0,0,0,0.85);
+      backdrop-filter: blur(8px);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 100;
+    }
+
+    .modal-content {
+      background: #12161f;
+      border: 1px solid var(--panel-border);
+      border-radius: 16px;
+      width: 750px;
+      height: 900px;
+      max-height: 95vh;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.9);
+    }
+
+    .modal-header {
+      font-family: 'Shippori Mincho', serif;
+      font-size: 1.3rem;
+      font-weight: 800;
+      color: var(--cyan-glow);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--panel-border);
+      padding-bottom: 0.8rem;
+      flex-shrink: 0;
+    }
+
+    .modal-tabs {
+      display: flex;
+      gap: 0.5rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      margin-top: 0.5rem;
+      flex-shrink: 0;
+    }
+
+    .tab-btn {
+      background: transparent;
+      border: none;
+      border-bottom: 2px solid transparent;
+      color: var(--text-sub);
+      padding: 0.5rem 1rem;
+      border-radius: 0;
+      box-shadow: none;
+      font-size: 0.95rem;
+      font-family: 'Shippori Mincho', serif;
+      font-weight: 600;
+      height: auto;
+    }
+
+    .tab-btn.active {
+      color: var(--cyan-glow);
+      border-bottom-color: var(--cyan-glow);
+      background: rgba(20, 243, 255, 0.05);
+    }
+
+    .tab-container {
+      flex: 1;
+      overflow-y: auto;
+      padding-right: 0.5rem;
+      margin-top: 1rem;
+    }
+
+    .tab-content { display: none; height: 100%; }
+    .tab-content.active { display: flex; flex-direction: column; }
+
+    .preset-bar {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: rgba(255,255,255,0.03);
+      padding: 0.8rem;
+      border-radius: 8px;
+      margin-bottom: 1rem;
+      border: 1px solid rgba(255,255,255,0.05);
+      flex-shrink: 0;
+      flex-wrap: wrap;
+    }
+
+    .preset-bar select {
+      flex: 1;
+      min-width: 140px;
+      background: #1a212d;
+      border: 1px solid var(--panel-border);
+      color: #fff;
+      font-family: 'Shippori Mincho', serif;
+      padding: 0.5rem;
+      border-radius: 6px;
+    }
+
+    .blinds-split-container {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 1rem;
+      flex: 1;
+      min-height: 0;
+    }
+
+    .blinds-list-panel {
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid var(--panel-border);
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .blinds-list-scroll {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+
+    .blind-card {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 6px;
+      padding: 0.6rem 0.8rem;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: all 0.2s ease;
+    }
+
+    .blind-card:hover {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .blind-card.active {
+      background: rgba(20, 243, 255, 0.12);
+      border-color: var(--cyan-glow);
+      box-shadow: 0 0 10px rgba(20, 243, 255, 0.2);
+    }
+
+    .blind-card.break-card {
+      border-left: 4px solid var(--gold-accent);
+    }
+
+    .blind-card-title {
+      font-weight: bold;
+      font-size: 0.85rem;
+      color: var(--text-main);
+    }
+
+    .blind-card-info {
+      font-size: 0.8rem;
+      color: var(--gold-accent);
+    }
+
+    .blind-detail-panel {
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid var(--panel-border);
+      border-radius: 8px;
+      padding: 1.2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.2rem;
+    }
+
+    .blind-detail-title {
+      font-size: 1.1rem;
+      font-weight: bold;
+      color: var(--cyan-glow);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      padding-bottom: 0.5rem;
+    }
+
+    .design-container {
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    .color-grid {
+      display: grid;
+      grid-template-columns: repeat(10, 1fr);
+      gap: 8px;
+      margin-top: 0.5rem;
+    }
+
+    .color-box {
+      width: 100%;
+      height: 36px;
+      border-radius: 6px;
+      border: 2px solid rgba(255, 255, 255, 0.2);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      position: relative;
+    }
+
+    .color-box:hover {
+      transform: scale(1.08);
+      border-color: #ffffff;
+    }
+
+    .color-box.active {
+      border-color: #ffffff;
+      box-shadow: 0 0 12px currentColor;
+    }
+
+    .accordion-section {
+      margin-top: 0.5rem;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .accordion-header {
+      background: rgba(255, 255, 255, 0.03);
+      padding: 0.8rem 1rem;
+      font-size: 0.9rem;
+      font-weight: bold;
+      color: var(--text-sub);
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: background 0.2s;
+    }
+
+    .accordion-header:hover {
+      background: rgba(255, 255, 255, 0.07);
+      color: var(--text-main);
+    }
+
+    .accordion-content {
+      padding: 1.2rem;
+      background: rgba(0, 0, 0, 0.3);
+      display: none;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+    }
+
+    .accordion-content.open {
+      display: grid;
+    }
+
+    .rgb-sliders {
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+    }
+
+    .rgb-row {
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+      font-size: 0.8rem;
+    }
+
+    .rgb-row span { width: 15px; font-weight: bold; }
+
+    .color-picker-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 0.6rem;
+    }
+
+    .color-picker-row label {
+      font-size: 0.85rem;
+      color: var(--text-sub);
+    }
+
+    .color-picker-row input[type="color"] {
+      border: none;
+      width: 32px;
+      height: 32px;
+      border-radius: 4px;
+      cursor: pointer;
+      background: none;
+    }
+
+    .preview-box {
+      background: #080b10;
+      border: 1px solid var(--panel-border);
+      border-radius: 12px;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.8);
+    }
+
+    .preview-box .preview-label {
+      font-size: 0.75rem;
+      color: var(--text-sub);
+      margin-bottom: 1rem;
+      letter-spacing: 0.1em;
+    }
+
+    .preview-timer {
+      font-size: 2.8rem;
+      text-shadow: 
+        0 0 calc(8px * var(--glow-intensity)) var(--cyan-glow),
+        0 0 calc(20px * var(--glow-intensity)) var(--cyan-glow);
+      margin-bottom: 0.5rem;
+    }
+
+    .preview-box .preview-level {
+      font-family: var(--timer-font);
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--cyan-glow);
+      text-shadow: 0 0 calc(6px * var(--glow-intensity)) var(--cyan-glow);
+    }
+
+    .form-group input, .form-group select {
+      background: #1a212d;
+      border: 1px solid var(--panel-border);
+      color: #fff;
+      font-family: 'Shippori Mincho', serif;
+      padding: 0.5rem;
+      width: 100%;
+      text-align: center;
+      border-radius: 6px;
+    }
+
+    .form-group select option {
+      background: #12161f;
+      color: #fff;
+    }
+
+    .form-group select {
+      text-align-last: center;
+      cursor: pointer;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .form-group label {
+      color: var(--text-sub);
+      font-size: 0.85rem;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .btn-small {
+      padding: 0.2rem 0.4rem;
+      font-size: 0.75rem;
+      border-radius: 6px;
+      display: inline-flex;
+      height: auto;
+    }
+
+    .modal-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 1rem;
+      border-top: 1px solid rgba(255,255,255,0.1);
+      padding-top: 1rem;
+      flex-shrink: 0;
+    }
+
+    .backup-controls {
+      display: flex;
+      gap: 0.5rem;
+    }
+  </style>
+</head>
+<body>
+
+<div class="timer-frame">
+  <div class="save-flash-notice" id="flash-notice">PREVIEW APPLIED</div>
+
+  <div class="top-section">
+    <div class="panel">
+      <div class="panel-header">CURRENT BLINDS</div>
+      <div class="item-group">
+        <div class="item-value" id="current-sb-bb">SB 100 / BB 200 ANTE 200</div>
+      </div>
+      
+      <div class="panel-header" style="margin-top: 2vh;">NEXT BLINDS</div>
+      <div class="item-group">
+        <div class="item-value" id="next-sb-bb">SB 200 / BB 400 ANTE 400</div>
+      </div>
+    </div>
+
+    <div class="timer-wrapper">
+      <div class="timer-container">
+        <svg class="progress-ring" viewBox="-20 -20 330 330">
+          <circle class="progress-ring__circle_bg" stroke-width="12" r="130" cx="145" cy="145"/>
+          <circle class="progress-ring__circle_bar" stroke-width="12" r="130" cx="145" cy="145"/>
+        </svg>
+        <div class="timer-inner">
+          <div id="time-display">
+            <span class="time-part minutes" id="time-minutes">15</span><span class="time-colon">:</span><span class="time-part seconds" id="time-seconds">00</span>
+          </div>
+          <p id="level-display">LEVEL 1</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">TOURNAMENT INFO</div>
+      <div class="info-item">
+        <div class="info-label">Players Left:</div>
+        <div class="info-value">
+          <button class="btn-small admin-only" onclick="changePlayersLeft(-1)">-</button>
+          <span id="players-left-display">10</span>
+          <button class="btn-small admin-only" onclick="changePlayersLeft(1)">+</button>
+          <span style="color: var(--text-sub);">/</span>
+          <span id="total-entries-display">10</span>
+          <button class="btn-small admin-only" onclick="changeTotalEntries(-1)">-</button>
+          <button class="btn-small admin-only" onclick="changeTotalEntries(1)">+</button>
+        </div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">Avg Stack:</div>
+        <div class="info-value" id="avg-stack-display" style="color: var(--gold-accent);">10,000</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="bottom-section">
+    <button class="admin-only" onclick="prevLevel()">PREV LEVEL</button>
+    <button class="admin-only" id="start-stop-btn" onclick="toggleTimer()">START / PAUSE</button>
+    <button class="admin-only" onclick="nextLevel()">NEXT LEVEL</button>
+    <button class="admin-only" onclick="resetTimer()">RESET</button>
+    <button class="admin-only" onclick="openSettings()">SETTINGS ⚙️</button>
+    <button class="admin-only" onclick="generateViewerURL()">SHARE URL 🔗</button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="settings-modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <span>SETTINGS</span>
+      <button onclick="closeSettings()" style="padding: 0.2rem 0.6rem; height: auto;">✕</button>
+    </div>
+
+    <div class="modal-tabs">
+      <button class="tab-btn active" onclick="switchTab('blinds-tab')">ブラインド設定</button>
+      <button class="tab-btn" onclick="switchTab('stack-tab')">スタック設定</button>
+      <button class="tab-btn" onclick="switchTab('design-tab')">デザイン設定 🎨</button>
+    </div>
+
+    <div class="tab-container">
+      <div id="blinds-tab" class="tab-content active">
+        <div class="preset-bar">
+          <span style="font-size: 0.85rem; color: var(--text-sub);">プリセット:</span>
+          <select id="preset-select" onchange="loadSelectedPreset()"></select>
+          <button class="btn-small" onclick="saveAsNewPreset()">新規保存</button>
+          <button class="btn-small" onclick="deletePreset()" style="border-color: #ff4d4d; color: #ff4d4d;">削除</button>
+          <button class="btn-small" onclick="exportBlindsToExcel()" style="border-color: #2ed573; color: #2ed573;" title="ブラインド設定をExcel出力">Excel出力 📊</button>
+          <button class="btn-small" onclick="importBlindsFromExcelClick()" style="border-color: #1e90ff; color: #1e90ff;" title="Excelファイルからブラインドを読込">Excel読込 📂</button>
+          <input type="file" id="excel-file-input" accept=".xlsx, .xls" style="display: none;" onchange="handleExcelImport(event)">
+        </div>
+
+        <div class="blinds-split-container">
+          <div class="blinds-list-panel">
+            <div class="blinds-list-scroll" id="blinds-list-scroll"></div>
+            <div style="display: flex; gap: 0.4rem; padding: 0.5rem; background: rgba(0,0,0,0.3); border-top: 1px solid var(--panel-border);">
+              <button onclick="addLevelRow(false)" style="flex: 1; font-size: 0.75rem; height: auto; padding: 0.4rem 0;">＋LEVEL</button>
+              <button onclick="addLevelRow(true)" style="flex: 1; font-size: 0.75rem; border-color: var(--gold-accent); color: var(--gold-accent); height: auto; padding: 0.4rem 0;">＋BREAK</button>
+            </div>
+          </div>
+
+          <div class="blind-detail-panel" id="blind-detail-panel">
+            <div class="blind-detail-title" id="detail-title">LEVEL 1</div>
+            
+            <div id="detail-form-area" style="display: flex; flex-direction: column; gap: 1rem;">
+              <div class="form-group" id="group-sb">
+                <label>
+                  <span>スモールブラインド (SB)</span>
+                  <span id="sb-step-hint" style="font-size: 0.75rem; color: var(--cyan-glow);">(ステップ: 100)</span>
+                </label>
+                <input type="number" id="detail-sb" step="100">
+              </div>
+              <div class="form-group" id="group-bb">
+                <label>ビッグブラインド (BB)</label>
+                <input type="number" id="detail-bb" step="100">
+              </div>
+              <div class="form-group" id="group-ante">
+                <label>アンティ (ANTE)</label>
+                <input type="number" id="detail-ante" step="100">
+              </div>
+              <div class="form-group">
+                <label>時間 (分)</label>
+                <input type="number" id="detail-time" min="1" step="1">
+              </div>
+
+              <div style="display: flex; gap: 0.5rem; margin-top: auto;">
+                <button class="btn-small" onclick="moveSelectedRow(-1)" style="flex: 1;">▲ 上へ移動</button>
+                <button class="btn-small" onclick="moveSelectedRow(1)" style="flex: 1;">▼ 下へ移動</button>
+                <button class="btn-small" onclick="deleteSelectedRow()" style="border-color: #ff4d4d; color: #ff4d4d;">削除 ✕</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="stack-tab" class="tab-content">
+        <div style="max-width: 320px; margin: 1rem auto 0 auto;">
+          <div class="form-group">
+            <label>スタートスタック (5,000刻み)</label>
+            <input type="number" id="setting-start-stack" value="10000" step="5000" min="0">
+          </div>
+          <div class="form-group">
+            <label>総エントリー数 (最大数)</label>
+            <input type="number" id="setting-total-entries" value="10" min="1">
+          </div>
+        </div>
+      </div>
+
+      <div id="design-tab" class="tab-content">
+        <div class="design-container">
+          <div class="preview-box">
+            <div class="preview-label">REALTIME PREVIEW</div>
+            <div class="preview-timer" id="preview-timer-text">
+              <span class="time-part minutes" id="preview-minutes">15</span><span class="time-colon">:</span><span class="time-part seconds" id="preview-seconds">00</span>
+            </div>
+            <div class="preview-level" id="preview-level-text">LEVEL 1</div>
+            <div style="margin-top: 1rem; font-size: 0.8rem; color: var(--gold-accent);" id="preview-blind-text">SB 100 / BB 200</div>
+          </div>
+
+          <div>
+            <div class="form-group">
+              <label>テーマカラーパレット（20色）</label>
+              <div class="color-grid" id="color-palette"></div>
+            </div>
+
+            <div class="form-group" style="margin-top: 1.2rem;">
+              <label>タイマー文字フォント (30種類)</label>
+              <select id="setting-timer-font" onchange="updateLivePreview()">
+                <option value="'Shippori Mincho', serif" style="font-family: 'Shippori Mincho';">01. 高級明朝体 (Shippori Mincho)</option>
+                <option value="'Orbitron', sans-serif" style="font-family: 'Orbitron';">02. Orbitron (SFデジタル)</option>
+                <option value="'Share Tech Mono', monospace" style="font-family: 'Share Tech Mono';">03. Share Tech Mono (レトロ)</option>
+                <option value="'VT323', monospace" style="font-family: 'VT323';">04. VT323 (ドット絵風)</option>
+                <option value="'Press Start 2P', cursive" style="font-family: 'Press Start 2P'; font-size: 0.7rem;">05. Press Start 2P (8bit)</option>
+                <option value="'Michroma', sans-serif" style="font-family: 'Michroma'; font-size: 0.7rem;">06. Michroma (ワイドSF)</option>
+                <option value="'Iceland', cursive" style="font-family: 'Iceland';">07. Iceland (サイバーポップ)</option>
+                <option value="'Wallpoet', cursive" style="font-family: 'Wallpoet'; font-size: 0.75rem;">08. Wallpoet (未来派ステンシル)</option>
+                <option value="'Zen Dots', cursive" style="font-family: 'Zen Dots'; font-size: 0.75rem;">09. Zen Dots (未来系フラット)</option>
+                <option value="'Space Grotesk', sans-serif" style="font-family: 'Space Grotesk';">10. Space Grotesk (近未来モダン)</option>
+                <option value="'Rajdhani', sans-serif" style="font-family: 'Rajdhani';">11. Rajdhani (モダン)</option>
+                <option value="'Chakra Petch', sans-serif" style="font-family: 'Chakra Petch';">12. Chakra Petch (ミリタリー)</option>
+                <option value="'Teko', sans-serif" style="font-family: 'Teko';">13. Teko (ウルトラ縦長)</option>
+                <option value="'Fira Code', monospace" style="font-family: 'Fira Code';">14. Fira Code (等幅コード)</option>
+                <option value="'Russo One', sans-serif" style="font-family: 'Russo One';">15. Russo One (極太)</option>
+                <option value="'Montserrat', sans-serif" style="font-family: 'Montserrat';">16. Montserrat (モダン角)</option>
+                <option value="'M PLUS 1p', sans-serif" style="font-family: 'M PLUS 1p';">17. M PLUS 1p (太角ゴシック)</option>
+                <option value="'M PLUS Rounded 1c', sans-serif" style="font-family: 'M PLUS Rounded 1c';">18. M PLUS Rounded 1c (丸ゴシック)</option>
+                <option value="'Oswald', sans-serif" style="font-family: 'Oswald';">19. Oswald (縦長太字)</option>
+                <option value="'Bebas Neue', cursive" style="font-family: 'Bebas Neue';">20. Bebas Neue (スタイリッシュ縦長)</option>
+                <option value="'Anton', sans-serif" style="font-family: 'Anton';">21. Anton (重厚インパクト)</option>
+                <option value="'Righteous', cursive" style="font-family: 'Righteous';">22. Righteous (レトロフューチャー)</option>
+                <option value="'Saira Stencil One', cursive" style="font-family: 'Saira Stencil One'; font-size: 0.7rem;">23. Saira Stencil One (極太ステンシル)</option>
+                <option value="'Graduate', cursive" style="font-family: 'Graduate'; font-size: 0.75rem;">24. Graduate (カレッジカジノ)</option>
+                <option value="'Cinzel', serif" style="font-family: 'Cinzel';">25. Cinzel (カジノ古典)</option>
+                <option value="'Permanent Marker', cursive" style="font-family: 'Permanent Marker'; font-size: 0.75rem;">26. Permanent Marker (手書きマーカー)</option>
+                <option value="'Nico Moji', cursive" style="font-family: 'Nico Moji';">27. Nico Moji (ニコモジ・ポップ)</option>
+                <option value="'KouzanGoshikiosho', serif" style="font-family: 'KouzanGoshikiosho';">28. 衡山毛筆草書 (極太和風毛筆)</option>
+                <option value="'Yuji Syuku', serif" style="font-family: 'Yuji Syuku';">29. 祐地 宿 (伝統書体)</option>
+                <option value="sans-serif">30. System Default (標準)</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label>
+                <span>ネオン発光の明るさ</span>
+                <span id="glow-val-text">10%</span>
+              </label>
+              <input type="range" id="setting-glow-intensity" min="0.1" max="1.5" step="0.1" value="0.1" oninput="updateLivePreview()">
+            </div>
+          </div>
+
+          <div class="accordion-section">
+            <div class="accordion-header" onclick="toggleAccordion()">
+              <span>アドバンスド カスタム設定 ⚙️（上級者用）</span>
+              <span id="accordion-arrow">▼</span>
+            </div>
+            <div class="accordion-content" id="accordion-body">
+              <div>
+                <div class="form-group">
+                  <label>RGB微調整（メインカラー）</label>
+                  <div class="rgb-sliders">
+                    <div class="rgb-row"><span style="color:#ff4d4d">R</span><input type="range" id="rgb-r" min="0" max="255" value="20" oninput="onRGBChange()"></div>
+                    <div class="rgb-row"><span style="color:#39ff14">G</span><input type="range" id="rgb-g" min="0" max="255" value="243" oninput="onRGBChange()"></div>
+                    <div class="rgb-row"><span style="color:#0066ff">B</span><input type="range" id="rgb-b" min="0" max="255" value="255" oninput="onRGBChange()"></div>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <div class="color-picker-row">
+                  <label>ブラインド数字カラー</label>
+                  <input type="color" id="custom-blind-color" value="#ffb703" onchange="updateLivePreview()">
+                </div>
+                <div class="color-picker-row">
+                  <label>タイマー数字カラー</label>
+                  <input type="color" id="custom-timer-color" value="#ffffff" onchange="updateLivePreview()">
+                </div>
+                <div class="color-picker-row">
+                  <label>サブテキストカラー</label>
+                  <input type="color" id="custom-sub-color" value="#7a8b9e" onchange="updateLivePreview()">
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <div class="backup-controls">
+        <button class="btn-small" onclick="exportConfig()" title="設定全体をファイルに保存">JSON保存 📥</button>
+        <button class="btn-small" onclick="importConfigClick()" title="保存したJSONファイルを読み込み">JSON読み込み 📤</button>
+        <input type="file" id="import-file-input" accept=".json" style="display: none;" onchange="handleImportFile(event)">
+      </div>
+
+      <button onclick="saveSettings()" style="background: var(--cyan-dim); border-color: var(--cyan-glow); color: var(--cyan-glow); height: auto; padding: 0.5rem 1rem;">SAVE & APPLY</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // 音声ファイルの指定・読み込み
+  const sound1min = new Audio('1min.mp3');     // 1分前 SE
+  const soundCount = new Audio('count.mp3');   // 3秒前 SE
+  const soundLevelUp = new Audio('LevelUP.mp3'); // 0秒 (ブラインド切り替え) SE
+
+  function playSE(audio) {
+    try {
+      audio.currentTime = 0;
+      audio.play().catch(e => console.log("SE Play Error:", e));
+    } catch(e) {
+      console.log("SE Exception:", e);
+    }
+  }
+
+  // デフォルト構造
+  let presets = {
+    'デフォルト (100-5000)': [
+      { type: 'level', sb: 100, bb: 200, ante: 200, time: 15 },
+      { type: 'level', sb: 200, bb: 400, ante: 400, time: 15 },
+      { type: 'level', sb: 300, bb: 600, ante: 600, time: 15 },
+      { type: 'level', sb: 400, bb: 800, ante: 800, time: 15 },
+      { type: 'level', sb: 600, bb: 1200, ante: 1200, time: 15 },
+      { type: 'level', sb: 800, bb: 1600, ante: 1600, time: 15 },
+      { type: 'level', sb: 1000, bb: 2000, ante: 2000, time: 15 },
+      { type: 'level', sb: 1500, bb: 3000, ante: 3000, time: 15 },
+      { type: 'break', sb: 0, bb: 0, ante: 0, time: 10 },
+      { type: 'level', sb: 2000, bb: 4000, ante: 4000, time: 15 },
+      { type: 'level', sb: 2500, bb: 5000, ante: 5000, time: 15 }
+    ]
+  };
+
+  let activePresetKey = 'デフォルト (100-5000)';
+  let structure = JSON.parse(JSON.stringify(presets[activePresetKey]));
+  let editingStructure = [];
+  let selectedIndex = 0;
+
+  let tournamentInfo = {
+    startStack: 10000,
+    totalEntries: 10,
+    playersLeft: 10
+  };
+
+  const themeColors = {
+    cyan: { name: 'シアン', glow: '#14f3ff', rgb: [20, 243, 255] },
+    gold: { name: 'ゴールド', glow: '#ffb703', rgb: [255, 183, 3] },
+    pink: { name: 'ピンク', glow: '#ff007f', rgb: [255, 0, 127] },
+    green: { name: 'ライム', glow: '#39ff14', rgb: [57, 255, 20] },
+    red: { name: 'レッド', glow: '#ff3333', rgb: [255, 51, 51] },
+    blue: { name: 'ブルー', glow: '#0066ff', rgb: [0, 102, 255] },
+    purple: { name: 'パープル', glow: '#9d00ff', rgb: [157, 0, 255] },
+    orange: { name: 'オレンジ', glow: '#ff6600', rgb: [255, 102, 0] },
+    mint: { name: 'ミント', glow: '#00ffaa', rgb: [0, 255, 170] },
+    magenta: { name: 'マゼンタ', glow: '#ff00aa', rgb: [255, 0, 170] },
+    amber: { name: 'アンバー', glow: '#ffcc00', rgb: [255, 204, 0] },
+    violet: { name: 'バイオレット', glow: '#7f00ff', rgb: [127, 0, 255] },
+    teal: { name: 'ティール', glow: '#00e5ff', rgb: [0, 229, 255] },
+    coral: { name: 'コーラル', glow: '#ff5555', rgb: [255, 85, 85] },
+    ice: { name: 'アイス', glow: '#e0ffff', rgb: [224, 255, 255] },
+    emerald: { name: 'エメラルド', glow: '#50c878', rgb: [80, 200, 120] },
+    acid: { name: 'アシッド', glow: '#ccff00', rgb: [204, 255, 0] },
+    blood: { name: 'ブラッド', glow: '#ff2400', rgb: [255, 36, 0] },
+    lavender: { name: 'ラベンダー', glow: '#b57edc', rgb: [181, 126, 220] },
+    matrix: { name: 'マトリックス', glow: '#00ff41', rgb: [0, 255, 65] }
+  };
+
+  let designConfig = {
+    colorKey: 'cyan',
+    customGlowHex: '#14f3ff',
+    font: "'Shippori Mincho', serif",
+    glow: 0.1,
+    blindColor: '#ffb703',
+    timerColor: '#ffffff',
+    subColor: '#7a8b9e'
+  };
+
+  let currentLevelIdx = 0;
+  let timeLeft = structure[0].time * 60; // 秒単位（整数）
+  let totalTime = timeLeft;
+  let timerAnimationId = null;
+  let startTime = null;
+  let pausedTimeLeft = null;
+  let lastPlayedSecond = null;
+  let isRunning = false;
+  let isViewerMode = false;
+
+  let peer = null;
+  let connections = [];
+
+  const timeMinutesDisplay = document.getElementById('time-minutes');
+  const timeSecondsDisplay = document.getElementById('time-seconds');
+  const levelDisplay = document.getElementById('level-display');
+  const currentBlindsDisplay = document.getElementById('current-sb-bb');
+  const nextBlindsDisplay = document.getElementById('next-sb-bb');
+  const circleBar = document.querySelector('.progress-ring__circle_bar');
+  const startStopBtn = document.getElementById('start-stop-btn');
+
+  const playersLeftDisplay = document.getElementById('players-left-display');
+  const totalEntriesDisplay = document.getElementById('total-entries-display');
+  const avgStackDisplay = document.getElementById('avg-stack-display');
+
+  const radius = circleBar.r.baseVal.value;
+  const circumference = radius * 2 * Math.PI;
+  circleBar.style.strokeDasharray = `${circumference} ${circumference}`;
+
+  function applyDesign() {
+    const glowHex = designConfig.customGlowHex || themeColors[designConfig.colorKey]?.glow || '#14f3ff';
+    document.documentElement.style.setProperty('--cyan-glow', glowHex);
+    document.documentElement.style.setProperty('--cyan-dim', hexToRgba(glowHex, 0.25));
+    document.documentElement.style.setProperty('--timer-font', designConfig.font);
+    document.documentElement.style.setProperty('--glow-intensity', designConfig.glow);
+    document.documentElement.style.setProperty('--gold-accent', designConfig.blindColor);
+    document.documentElement.style.setProperty('--timer-text-color', designConfig.timerColor);
+    document.documentElement.style.setProperty('--text-sub', designConfig.subColor);
+
+    const prevBlind = document.getElementById('preview-blind-text');
+    if (prevBlind) prevBlind.style.color = designConfig.blindColor;
+  }
+
+  function hexToRgba(hex, alpha) {
+    let c = hex.replace('#', '');
+    if (c.length === 3) c = c.split('').map(x => x + x).join('');
+    const num = parseInt(c, 16);
+    return `rgba(${(num >> 16) & 255}, ${(num >> 8) & 255}, ${num & 255}, ${alpha})`;
+  }
+
+  function hexToRgbArray(hex) {
+    let c = hex.replace('#', '');
+    if (c.length === 3) c = c.split('').map(x => x + x).join('');
+    const num = parseInt(c, 16);
+    return [(num >> 16) & 255, (num >> 8) & 255, num & 255];
+  }
+
+  function rgbToHex(r, g, b) {
+    return '#' + [r, g, b].map(x => {
+      const hex = parseInt(x).toString(16);
+      return hex.length === 1 ? '0' + hex : hex;
+    }).join('');
+  }
+
+  function initColorPalette() {
+    const grid = document.getElementById('color-palette');
+    grid.innerHTML = '';
+    Object.keys(themeColors).forEach(key => {
+      const item = themeColors[key];
+      const box = document.createElement('div');
+      box.className = `color-box ${key === designConfig.colorKey ? 'active' : ''}`;
+      box.style.backgroundColor = item.glow;
+      box.title = item.name;
+      box.onclick = (e) => selectPaletteColor(key, e);
+      grid.appendChild(box);
+    });
+  }
+
+  function selectPaletteColor(key, event) {
+    designConfig.colorKey = key;
+    designConfig.customGlowHex = themeColors[key].glow;
+    
+    const [r, g, b] = themeColors[key].rgb;
+    document.getElementById('rgb-r').value = r;
+    document.getElementById('rgb-g').value = g;
+    document.getElementById('rgb-b').value = b;
+
+    document.querySelectorAll('.color-box').forEach(b => b.classList.remove('active'));
+    if (event && event.target) {
+      event.target.classList.add('active');
+    }
+
+    updateLivePreview();
+  }
+
+  function onRGBChange() {
+    const r = document.getElementById('rgb-r').value;
+    const g = document.getElementById('rgb-g').value;
+    const b = document.getElementById('rgb-b').value;
+    
+    designConfig.customGlowHex = rgbToHex(r, g, b);
+    document.querySelectorAll('.color-box').forEach(box => box.classList.remove('active'));
+    
+    updateLivePreview();
+  }
+
+  function toggleAccordion() {
+    const content = document.getElementById('accordion-body');
+    const arrow = document.getElementById('accordion-arrow');
+    if (content.classList.contains('open')) {
+      content.classList.remove('open');
+      arrow.textContent = '▼';
+    } else {
+      content.classList.add('open');
+      arrow.textContent = '▲';
+    }
+  }
+
+  function updateLivePreview() {
+    designConfig.font = document.getElementById('setting-timer-font').value;
+    designConfig.glow = parseFloat(document.getElementById('setting-glow-intensity').value) ?? 0.1;
+    designConfig.blindColor = document.getElementById('custom-blind-color').value;
+    designConfig.timerColor = document.getElementById('custom-timer-color').value;
+    designConfig.subColor = document.getElementById('custom-sub-color').value;
+
+    document.getElementById('glow-val-text').textContent = `${Math.round(designConfig.glow * 100)}%`;
+
+    applyDesign();
+  }
+
+  function setProgress(percent) {
+    const offset = circumference * (1 - percent);
+    circleBar.style.strokeDashoffset = offset;
+  }
+
+  function getLevelLabel(idx, struct = structure) {
+    let levelCount = 0;
+    for (let i = 0; i <= idx; i++) {
+      if (struct[i].type === 'level') levelCount++;
+    }
+    return struct[idx].type === 'break' ? 'BREAK' : `LEVEL ${levelCount}`;
+  }
+
+  function formatBlinds(item) {
+    if (item.type === 'break') return 'BREAK TIME';
+    let text = `SB ${item.sb} / BB ${item.bb}`;
+    if (item.ante && item.ante > 0) {
+      text += ` ANTE ${item.ante}`;
+    }
+    return text;
+  }
+
+  function updateDisplay(exactTimeLeft = timeLeft) {
+    const current = structure[currentLevelIdx] || structure[0];
+    const displaySeconds = Math.ceil(exactTimeLeft);
+    const minutes = Math.floor(displaySeconds / 60);
+    const seconds = displaySeconds % 60;
+
+    const minStr = String(minutes).padStart(2, '0');
+    const secStr = String(seconds).padStart(2, '0');
+
+    if (timeMinutesDisplay && timeSecondsDisplay) {
+      timeMinutesDisplay.textContent = minStr;
+      timeSecondsDisplay.textContent = secStr;
+    }
+
+    levelDisplay.textContent = getLevelLabel(currentLevelIdx);
+
+    currentBlindsDisplay.textContent = formatBlinds(current);
+
+    if (currentLevelIdx < structure.length - 1) {
+      const next = structure[currentLevelIdx + 1];
+      if (next.type === 'break') {
+        nextBlindsDisplay.textContent = 'NEXT: BREAK';
+      } else {
+        nextBlindsDisplay.textContent = formatBlinds(next);
+      }
+    } else {
+      nextBlindsDisplay.textContent = 'FINAL LEVEL';
+    }
+
+    const totalChips = tournamentInfo.startStack * tournamentInfo.totalEntries;
+    const avgStack = tournamentInfo.playersLeft > 0 ? Math.floor(totalChips / tournamentInfo.playersLeft) : 0;
+
+    playersLeftDisplay.textContent = tournamentInfo.playersLeft;
+    totalEntriesDisplay.textContent = tournamentInfo.totalEntries;
+    avgStackDisplay.textContent = avgStack.toLocaleString();
+
+    setProgress(exactTimeLeft / totalTime);
+
+    if (!isViewerMode) {
+      broadcastState();
+    }
+  }
+
+  function changePlayersLeft(delta) {
+    if (isViewerMode) return;
+    const newCount = tournamentInfo.playersLeft + delta;
+    if (newCount >= 0 && newCount <= tournamentInfo.totalEntries) {
+      tournamentInfo.playersLeft = newCount;
+      updateDisplay();
+    }
+  }
+
+  function changeTotalEntries(delta) {
+    if (isViewerMode) return;
+    const newTotal = tournamentInfo.totalEntries + delta;
+    if (newTotal >= 1) {
+      tournamentInfo.totalEntries = newTotal;
+      if (tournamentInfo.playersLeft > newTotal) {
+        tournamentInfo.playersLeft = newTotal;
+      }
+      updateDisplay();
+    }
+  }
+
+  window.addEventListener('DOMContentLoaded', () => {
+    const params = new URLSearchParams(window.location.search);
+    const hostId = params.get('host');
+
+    if (hostId) {
+      isViewerMode = true;
+      document.body.classList.add('view-only-mode');
+
+      peer = new Peer();
+      peer.on('open', () => {
+        const conn = peer.connect(hostId);
+        conn.on('data', (data) => {
+          structure = data.structure;
+          tournamentInfo = data.tournamentInfo;
+          currentLevelIdx = data.currentLevelIdx;
+          timeLeft = data.timeLeft;
+          totalTime = data.totalTime;
+          if (data.designConfig) {
+            designConfig = data.designConfig;
+            applyDesign();
+          }
+          updateDisplay();
+        });
+      });
+    } else {
+      peer = new Peer();
+      peer.on('connection', (conn) => {
+        connections.push(conn);
+        conn.on('open', () => {
+          broadcastState();
+        });
+      });
+    }
+
+    applyDesign();
+    updateDisplay();
+  });
+
+  function broadcastState() {
+    const state = { structure, tournamentInfo, currentLevelIdx, timeLeft, totalTime, designConfig };
+    connections.forEach(conn => {
+      if (conn.open) conn.send(state);
+    });
+  }
+
+  function tick(timestamp) {
+    if (!startTime) startTime = timestamp;
+    const elapsed = (timestamp - startTime) / 1000;
+    const currentExactTimeLeft = Math.max(0, pausedTimeLeft - elapsed);
+
+    timeLeft = Math.ceil(currentExactTimeLeft);
+
+    if (timeLeft !== lastPlayedSecond) {
+      if (timeLeft === 60) {
+        playSE(sound1min);
+      } else if (timeLeft === 3) {
+        playSE(soundCount);
+      }
+      lastPlayedSecond = timeLeft;
+    }
+
+    updateDisplay(currentExactTimeLeft);
+
+    if (currentExactTimeLeft > 0) {
+      timerAnimationId = requestAnimationFrame(tick);
+    } else {
+      cancelAnimationFrame(timerAnimationId);
+      timerAnimationId = null;
+
+      playSE(soundLevelUp);
+
+      if (currentLevelIdx < structure.length - 1) {
+        currentLevelIdx++;
+        timeLeft = structure[currentLevelIdx].time * 60;
+        totalTime = timeLeft;
+        pausedTimeLeft = timeLeft;
+        startTime = null;
+        lastPlayedSecond = null;
+        updateDisplay();
+        startTimer();
+      } else {
+        isRunning = false;
+        updateButton();
+      }
+    }
+  }
+
+  function startTimer() {
+    if (timerAnimationId || isViewerMode) return;
+    totalTime = structure[currentLevelIdx].time * 60;
+    pausedTimeLeft = timeLeft;
+    startTime = null;
+    timerAnimationId = requestAnimationFrame(tick);
+  }
+
+  function pauseTimer() {
+    if (timerAnimationId) {
+      cancelAnimationFrame(timerAnimationId);
+      timerAnimationId = null;
+    }
+  }
+
+  function updateButton() {
+    if (isViewerMode) return;
+    if (isRunning) {
+      startStopBtn.textContent = 'PAUSE';
+      startStopBtn.classList.add('running');
+    } else {
+      startStopBtn.textContent = 'START / PAUSE';
+      startStopBtn.classList.remove('running');
+    }
+  }
+
+  function toggleTimer() {
+    if (isViewerMode) return;
+
+    if (isRunning) {
+      pauseTimer();
+      isRunning = false;
+    } else {
+      startTimer();
+      isRunning = true;
+    }
+    updateButton();
+  }
+
+  function setLevel(idx) {
+    if (isViewerMode) return;
+    pauseTimer();
+    isRunning = false;
+    currentLevelIdx = idx;
+    timeLeft = structure[currentLevelIdx].time * 60;
+    totalTime = timeLeft;
+    pausedTimeLeft = timeLeft;
+    startTime = null;
+    lastPlayedSecond = null;
+    updateDisplay();
+    updateButton();
+  }
+
+  function nextLevel() { 
+    if (currentLevelIdx < structure.length - 1) {
+      playSE(soundLevelUp);
+      setLevel(currentLevelIdx + 1); 
+    }
+  }
+  function prevLevel() { if (currentLevelIdx > 0) setLevel(currentLevelIdx - 1); }
+  function resetTimer() { setLevel(0); }
+
+  function switchTab(tabId) {
+    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+    
+    if (event && event.target) {
+      event.target.classList.add('active');
+    }
+    document.getElementById(tabId).classList.add('active');
+  }
+
+  function renderPresetDropdown() {
+    const select = document.getElementById('preset-select');
+    select.innerHTML = '';
+    Object.keys(presets).forEach(key => {
+      const opt = document.createElement('option');
+      opt.value = key;
+      opt.textContent = key;
+      if (key === activePresetKey) opt.selected = true;
+      select.appendChild(opt);
+    });
+  }
+
+  function loadSelectedPreset() {
+    const select = document.getElementById('preset-select');
+    activePresetKey = select.value;
+    editingStructure = JSON.parse(JSON.stringify(presets[activePresetKey]));
+    selectedIndex = 0;
+    renderBlindsList();
+  }
+
+  function saveAsNewPreset() {
+    const name = prompt('保存するプリセット名を入力してください:', 'カスタム設定 ' + (Object.keys(presets).length + 1));
+    if (!name) return;
+
+    presets[name] = JSON.parse(JSON.stringify(editingStructure));
+    activePresetKey = name;
+    renderPresetDropdown();
+  }
+
+  function deletePreset() {
+    const keys = Object.keys(presets);
+    if (keys.length <= 1) {
+      alert('プリセットは最低1つ残す必要があります。');
+      return;
+    }
+
+    if (confirm(`プリセット「${activePresetKey}」を削除しますか？`)) {
+      delete presets[activePresetKey];
+      activePresetKey = Object.keys(presets)[0];
+      renderPresetDropdown();
+      loadSelectedPreset();
+    }
+  }
+
+  function renderBlindsList() {
+    const container = document.getElementById('blinds-list-scroll');
+    container.innerHTML = '';
+
+    editingStructure.forEach((item, index) => {
+      const card = document.createElement('div');
+      card.className = `blind-card ${item.type === 'break' ? 'break-card' : ''} ${index === selectedIndex ? 'active' : ''}`;
+      card.onclick = () => selectBlindRow(index);
+
+      const title = document.createElement('span');
+      title.className = 'blind-card-title';
+      title.textContent = getLevelLabel(index, editingStructure);
+
+      const info = document.createElement('span');
+      info.className = 'blind-card-info';
+      info.textContent = item.type === 'break' ? `${item.time}分` : `${item.sb}/${item.bb} (${item.time}分)`;
+
+      card.appendChild(title);
+      card.appendChild(info);
+      container.appendChild(card);
+    });
+
+    renderDetailPanel();
+  }
+
+  function selectBlindRow(index) {
+    selectedIndex = index;
+    renderBlindsList();
+  }
+
+  function calculateStep(sbValue) {
+    return (sbValue / 100 >= 20) ? 500 : 100;
+  }
+
+  function updateStepAttributes(sbValue) {
+    const step = calculateStep(sbValue);
+    const sbInput = document.getElementById('detail-sb');
+    const bbInput = document.getElementById('detail-bb');
+    const anteInput = document.getElementById('detail-ante');
+    const hintSpan = document.getElementById('sb-step-hint');
+
+    sbInput.step = step;
+    bbInput.step = step * 2;
+    anteInput.step = step * 2;
+    if (hintSpan) {
+      hintSpan.textContent = `(ステップ: ${step})`;
+    }
+  }
+
+  function renderDetailPanel() {
+    if (editingStructure.length === 0) {
+      document.getElementById('blind-detail-panel').style.display = 'none';
+      return;
+    }
+    document.getElementById('blind-detail-panel').style.display = 'flex';
+
+    const item = editingStructure[selectedIndex];
+    document.getElementById('detail-title').textContent = getLevelLabel(selectedIndex, editingStructure);
+
+    const groupSb = document.getElementById('group-sb');
+    const groupBb = document.getElementById('group-bb');
+    const groupAnte = document.getElementById('group-ante');
+
+    if (item.type === 'break') {
+      groupSb.style.display = 'none';
+      groupBb.style.display = 'none';
+      groupAnte.style.display = 'none';
+    } else {
+      groupSb.style.display = 'flex';
+      groupBb.style.display = 'flex';
+      groupAnte.style.display = 'flex';
+
+      document.getElementById('detail-sb').value = item.sb;
+      document.getElementById('detail-bb').value = item.bb;
+      document.getElementById('detail-ante').value = item.ante;
+
+      updateStepAttributes(item.sb);
+    }
+
+    document.getElementById('detail-time').value = item.time;
+
+    document.getElementById('detail-sb').oninput = (e) => {
+      const sb = parseInt(e.target.value) || 0;
+      item.sb = sb;
+      item.bb = sb * 2;
+      item.ante = sb * 2;
+
+      document.getElementById('detail-bb').value = item.bb;
+      document.getElementById('detail-ante').value = item.ante;
+
+      updateStepAttributes(sb);
+      renderBlindsList();
+    };
+
+    document.getElementById('detail-bb').oninput = (e) => { 
+      item.bb = parseInt(e.target.value) || 0; 
+      renderBlindsList(); 
+    };
+
+    document.getElementById('detail-ante').oninput = (e) => { 
+      item.ante = parseInt(e.target.value) || 0; 
+      renderBlindsList(); 
+    };
+
+    document.getElementById('detail-time').oninput = (e) => { 
+      item.time = parseInt(e.target.value) || 1; 
+      renderBlindsList(); 
+    };
+  }
+
+  function moveSelectedRow(direction) {
+    const newIndex = selectedIndex + direction;
+    if (newIndex >= 0 && newIndex < editingStructure.length) {
+      const temp = editingStructure[selectedIndex];
+      editingStructure[selectedIndex] = editingStructure[newIndex];
+      editingStructure[newIndex] = temp;
+      selectedIndex = newIndex;
+      renderBlindsList();
+    }
+  }
+
+  function deleteSelectedRow() {
+    if (editingStructure.length <= 1) {
+      alert('最低1つのレベルは必要です。');
+      return;
+    }
+    editingStructure.splice(selectedIndex, 1);
+    if (selectedIndex >= editingStructure.length) {
+      selectedIndex = editingStructure.length - 1;
+    }
+    renderBlindsList();
+  }
+
+  function addLevelRow(isBreak = false) {
+    let lastTime = 15;
+    if (editingStructure.length > 0) {
+      lastTime = editingStructure[editingStructure.length - 1].time;
+    }
+
+    if (isBreak) {
+      editingStructure.push({ type: 'break', sb: 0, bb: 0, ante: 0, time: 10 });
+    } else {
+      let lastSB = 100;
+      editingStructure.forEach(item => { if (item.type === 'level') lastSB = item.sb; });
+      
+      const step = calculateStep(lastSB);
+      const nextSB = lastSB + step;
+      editingStructure.push({ type: 'level', sb: nextSB, bb: nextSB * 2, ante: nextSB * 2, time: lastTime });
+    }
+    selectedIndex = editingStructure.length - 1;
+    renderBlindsList();
+  }
+
+  function openSettings() {
+    renderPresetDropdown();
+
+    editingStructure = JSON.parse(JSON.stringify(structure));
+    selectedIndex = 0;
+    renderBlindsList();
+
+    document.getElementById('setting-start-stack').value = tournamentInfo.startStack;
+    document.getElementById('setting-total-entries').value = tournamentInfo.totalEntries;
+
+    initColorPalette();
+    document.getElementById('setting-timer-font').value = designConfig.font;
+    document.getElementById('setting-glow-intensity').value = designConfig.glow ?? 0.1;
+
+    const rgb = hexToRgbArray(designConfig.customGlowHex || '#14f3ff');
+    document.getElementById('rgb-r').value = rgb[0];
+    document.getElementById('rgb-g').value = rgb[1];
+    document.getElementById('rgb-b').value = rgb[2];
+
+    document.getElementById('custom-blind-color').value = designConfig.blindColor || '#ffb703';
+    document.getElementById('custom-timer-color').value = designConfig.timerColor || '#ffffff';
+    document.getElementById('custom-sub-color').value = designConfig.subColor || '#7a8b9e';
+
+    updateLivePreview();
+    document.getElementById('settings-modal').style.display = 'flex';
+  }
+
+  function closeSettings() { document.getElementById('settings-modal').style.display = 'none'; }
+
+  function showFlashNotice() {
+    const notice = document.getElementById('flash-notice');
+    notice.style.opacity = '1';
+    setTimeout(() => {
+      notice.style.opacity = '0';
+    }, 1500);
+  }
+
+  function saveSettings() {
+    presets[activePresetKey] = JSON.parse(JSON.stringify(editingStructure));
+
+    let newStartStack = parseInt(document.getElementById('setting-start-stack').value) || 10000;
+    newStartStack = Math.round(newStartStack / 5000) * 5000;
+
+    const newTotalEntries = parseInt(document.getElementById('setting-total-entries').value) || 10;
+
+    if (newTotalEntries !== tournamentInfo.totalEntries) {
+      if (tournamentInfo.playersLeft > newTotalEntries) {
+        tournamentInfo.playersLeft = newTotalEntries;
+      }
+    }
+    tournamentInfo.startStack = newStartStack;
+    tournamentInfo.totalEntries = newTotalEntries;
+
+    applyDesign();
+
+    if (editingStructure.length > 0) {
+      structure = JSON.parse(JSON.stringify(editingStructure));
+      closeSettings();
+      setLevel(0);
+      showFlashNotice();
+    }
+  }
+
+  function exportConfig() {
+    presets[activePresetKey] = JSON.parse(JSON.stringify(editingStructure));
+
+    const exportData = {
+      presets: presets,
+      activePresetKey: activePresetKey,
+      tournamentInfo: tournamentInfo,
+      designConfig: designConfig
+    };
+
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData, null, 2));
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute("href", dataStr);
+    
+    const now = new Date();
+    const dateStr = now.toISOString().slice(0, 10);
+    downloadAnchor.setAttribute("download", `poker_timer_config_${dateStr}.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+  }
+
+  function importConfigClick() {
+    document.getElementById('import-file-input').click();
+  }
+
+  function handleImportFile(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      try {
+        const importedData = JSON.parse(e.target.result);
+        if (importedData.presets && importedData.tournamentInfo && importedData.designConfig) {
+          presets = importedData.presets;
+          activePresetKey = importedData.activePresetKey || Object.keys(presets)[0];
+          tournamentInfo = importedData.tournamentInfo;
+          designConfig = importedData.designConfig;
+
+          openSettings();
+          saveSettings();
+          alert('設定の読み込みが完了しました！');
+        } else {
+          alert('ファイル形式が正しくありません。');
+        }
+      } catch (err) {
+        alert('JSONファイルの読み込みに失敗しました: ' + err.message);
+      }
+    };
+    reader.readAsText(file);
+    event.target.value = '';
+  }
+
+  function exportBlindsToExcel() {
+    if (!editingStructure || editingStructure.length === 0) {
+      alert('出力するブラインドデータがありません。');
+      return;
+    }
+
+    const data = [
+      ['タイプ', 'SB', 'BB', 'ANTE', '時間(分)']
+    ];
+
+    editingStructure.forEach(item => {
+      data.push([
+        item.type,
+        item.type === 'break' ? 0 : item.sb,
+        item.type === 'break' ? 0 : item.bb,
+        item.type === 'break' ? 0 : item.ante,
+        item.time
+      ]);
+    });
+
+    const worksheet = XLSX.utils.aoa_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Blinds');
+
+    const fileName = `blinds_${activePresetKey.replace(/[^a-zA-Z0-9あ-んア-ンー-龠]/g, '_')}.xlsx`;
+    XLSX.writeFile(workbook, fileName);
+  }
+
+  function importBlindsFromExcelClick() {
+    document.getElementById('excel-file-input').click();
+  }
+
+  function handleExcelImport(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      try {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        
+        const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+        if (rows.length < 2) {
+          alert('データが見つかりませんでした。ヘッダー行＋1行以上のデータが必要です。');
+          return;
+        }
+
+        const newStructure = [];
+        for (let i = 1; i < rows.length; i++) {
+          const row = rows[i];
+          if (!row || row.length === 0) continue;
+
+          const rawType = String(row[0] || '').toLowerCase().trim();
+          const isBreak = rawType === 'break' || rawType === '休憩';
+
+          const timeVal = parseInt(row[4]) || parseInt(row[1]) || 15;
+
+          if (isBreak) {
+            newStructure.push({
+              type: 'break',
+              sb: 0,
+              bb: 0,
+              ante: 0,
+              time: timeVal
+            });
+          } else {
+            const sb = parseInt(row[1]) || 0;
+            const bb = parseInt(row[2]) || (sb * 2);
+            const ante = parseInt(row[3]) !== undefined ? parseInt(row[3]) : (sb * 2);
+
+            newStructure.push({
+              type: 'level',
+              sb: sb,
+              bb: bb,
+              ante: ante,
+              time: timeVal
+            });
+          }
+        }
+
+        if (newStructure.length === 0) {
+          alert('有効なブラインドデータがインポートできませんでした。');
+          return;
+        }
+
+        editingStructure = newStructure;
+        selectedIndex = 0;
+        renderBlindsList();
+        alert('Excelからブラインド設定を読み込みました！');
+
+      } catch (err) {
+        alert('Excelファイルの読み込みに失敗しました: ' + err.message);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+    event.target.value = '';
+  }
+
+  function generateViewerURL() {
+    if (!peer || !peer.id) {
+      alert('通信初期化中です。少々お待ちの上再度お試しください。');
+      return;
+    }
+    const viewerURL = `${window.location.origin}${window.location.pathname}?host=${peer.id}`;
+    
+    navigator.clipboard.writeText(viewerURL).then(() => {
+      alert('リアルタイム同期URLをコピーしました！');
+    }).catch(() => {
+      prompt('以下のURLをコピーして共有してください：', viewerURL);
+    });
+  }
+</script>
+
+</body>
+</html>
