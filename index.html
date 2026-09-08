@@ -1078,9 +1078,6 @@
 <!-- 【モーダル 2】SHARE URL (リアルタイム画面共有用ポップアップ) -->
 <div class="modal-overlay" id="share-modal">
   <div class="modal-content" style="width: 440px; height: auto; max-height: 90vh;">
-    <div class="modal-header" style="justify-content: flex-end;">
-      <button onclick="closeShareModal()" style="padding: 0.2rem 0.6rem; height: auto; width: auto;">✕</button>
-    </div>
     <div style="padding: 1.5rem 0 1rem 0; display: flex; flex-direction: column; align-items: center; gap: 1.2rem;">
       
       <!-- 生成されたQRコードが挿入されるエリア -->
@@ -1510,6 +1507,19 @@
 
     applyDesign();
     updateDisplay();
+  });
+
+  // ウィンドウ外（モーダルの暗い背景）をクリックした時にモーダルを閉じる処理
+  window.addEventListener('click', (event) => {
+    const settingsModal = document.getElementById('settings-modal');
+    const shareModal = document.getElementById('share-modal');
+    
+    if (event.target === settingsModal) {
+      closeSettings();
+    }
+    if (event.target === shareModal) {
+      closeShareModal();
+    }
   });
 
   // 全子画面（閲覧者）にデータ配信
