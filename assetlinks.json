@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "io.github.pararefe.twa",
+        "sha256_cert_fingerprints": ["4F:AD:8B:5B:1C:C8:7F:16:32:47:56:D5:F0:03:23:A9:2B:AC:B5:F2:81:93:59:4D:B7:42:6B:09:86:B8:78:85"]
+      }
+    }]
