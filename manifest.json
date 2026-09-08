@@ -1,0 +1,11 @@
+{
+  "background_color": "#ffffff",
+  "dir": "ltr",
+  "display": "standalone",
+  "name": "PokerTimer",
+  "orientation": "any",
+  "scope": "/",
+  "short_name": "PokerTimer",
+  "start_url": "/poker_timer/",
+  "theme_color": "#ffffff"
+}
