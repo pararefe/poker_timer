@@ -1,11 +1,17 @@
 {
-  "background_color": "#ffffff",
-  "dir": "ltr",
-  "display": "standalone",
-  "name": "PokerTimer",
-  "orientation": "any",
-  "scope": "/",
+  "name": "Poker Timer",
   "short_name": "PokerTimer",
-  "start_url": "/poker_timer/",
-  "theme_color": "#ffffff"
+  "description": "Poker Timer App",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#000000",
+  "icons": [
+    {
+      "src": "./PTicon.png",
+      "sizes": "192x192 512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
 }
