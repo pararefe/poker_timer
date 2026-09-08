@@ -4,31 +4,40 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Poker Tournament Timer</title>
+
+  <!-- PWA（Webアプリ化）用の設定ファイル -->
   <link rel="manifest" href="./manifest.json">
+
+  <!-- 外部ライブラリの読み込み -->
+  <!-- 1. PeerJS: リアルタイム画面共有（通信）を行うライブラリ -->
   <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-  <!-- Excel操作ライブラリ (SheetJS) -->
+  <!-- 2. SheetJS: Excelファイルの読み書きを行うライブラリ -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <!-- QRコード生成ライブラリ -->
+  <!-- 3. QRCode.js: 共有用QRコードを自動生成するライブラリ -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
   <style>
+    /* Google Fonts から様々なデザインフォントを一括読み込み */
     @import url('https://fonts.googleapis.com/css2?family=Anton&family=Bebas+Neue&family=Chakra+Petch:wght@700&family=Cinzel:wght@700&family=Fira+Code:wght@700&family=Graduate&family=Iceland&family=KouzanGoshikiosho&family=M+PLUS+1p:wght@800&family=M+PLUS+Rounded+1c:wght@800&family=Michroma&family=Montserrat:wght@800&family=Nico+Moji&family=Orbitron:wght@500;700;800;900&family=Oswald:wght@700&family=Permanent+Marker&family=Press+Start+2P&family=Rajdhani:wght@600;700&family=RFP&family=Righteous&family=Russo+One&family=Saira+Stencil+One&family=Share+Tech+Mono&family=Shippori+Mincho:wght@600;800&family=Space+Grotesk:wght@700&family=Teko:wght@600&family=VT323&family=Wallpoet&family=Yuji+Syuku&family=Zen+Dots&display=swap');
 
+    /* CSS変数（デザイン全体の色やフォントをまとめた共通設定） */
     :root {
-      --bg-dark: #0a0d12;
-      --panel-bg: linear-gradient(145deg, rgba(25, 33, 44, 0.8), rgba(15, 20, 28, 0.9));
-      --panel-border: rgba(255, 255, 255, 0.08);
-      --cyan-glow: #14f3ff;
-      --cyan-dim: rgba(20, 243, 255, 0.25);
-      --glow-intensity: 0.1;
-      --gold-accent: #ffb703;
-      --text-sub: #7a8b9e;
-      --text-main: #f0f4f8;
-      --timer-text-color: #ffffff;
-      --btn-grad: linear-gradient(180deg, #323b48 0%, #1a202c 100%);
-      --btn-border: rgba(255, 255, 255, 0.15);
-      --timer-font: 'Shippori Mincho', serif;
+      --bg-dark: #0a0d12; /* 全体背景色 */
+      --panel-bg: linear-gradient(145deg, rgba(25, 33, 44, 0.8), rgba(15, 20, 28, 0.9)); /* パネル背景グラデーション */
+      --panel-border: rgba(255, 255, 255, 0.08); /* 枠線カラー */
+      --cyan-glow: #14f3ff; /* テーマのネオンカラー */
+      --cyan-dim: rgba(20, 243, 255, 0.25); /* 薄いネオンカラー */
+      --glow-intensity: 0.1; /* 光の強さ */
+      --gold-accent: #ffb703; /* ブラインド数値などのアクセントカラー */
+      --text-sub: #7a8b9e; /* 補足テキスト文字色 */
+      --text-main: #f0f4f8; /* メインテキスト文字色 */
+      --timer-text-color: #ffffff; /* タイマー数字の文字色 */
+      --btn-grad: linear-gradient(180deg, #323b48 0%, #1a202c 100%); /* ボタン背景 */
+      --btn-border: rgba(255, 255, 255, 0.15); /* ボタン枠線 */
+      --timer-font: 'Shippori Mincho', serif; /* タイマーの基本フォント */
     }
 
+    /* 画面全体の初期化 */
     * { box-sizing: border-box; user-select: none; margin: 0; padding: 0; }
 
     body {
@@ -46,6 +55,7 @@
       overflow: hidden;
     }
 
+    /* タイマー画面の全体枠（外枠） */
     .timer-frame {
       display: flex;
       flex-direction: column;
@@ -60,6 +70,7 @@
       overflow: visible;
     }
 
+    /* メインエリア：3列グリッドレイアウト（左：情報 / 中央：タイマー / 右：操作ボタン） */
     .main-section {
       display: grid;
       grid-template-columns: 26% 1fr minmax(160px, 14vw);
@@ -71,6 +82,7 @@
       overflow: visible;
     }
 
+    /* 左側情報パネルの共通デザイン */
     .panel {
       background: var(--panel-bg);
       border: 1px solid var(--panel-border);
@@ -132,6 +144,7 @@
       opacity: 0.95;
     }
 
+    /* 中央タイマー表示エリアのデザイン */
     .timer-wrapper {
       display: flex;
       justify-content: center;
@@ -141,6 +154,7 @@
       overflow: visible;
     }
 
+    /* 円型タイマーのクリック可能領域 */
     .timer-container {
       width: min(95vw, 95vh);
       height: min(95vw, 95vh);
@@ -149,16 +163,20 @@
       justify-content: center;
       align-items: center;
       overflow: visible;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
     }
 
+    /* SVG円形プログレスバー（時間の経過で削れるゲージ） */
     .progress-ring {
       width: 100%;
       height: 100%;
       position: absolute;
       top: 0;
       left: 0;
-      transform: rotate(-90deg);
+      transform: rotate(-90deg); /* 12時の位置からゲージを開始させる回転 */
       overflow: visible;
+      pointer-events: none;
     }
 
     .progress-ring__circle_bg { 
@@ -176,6 +194,7 @@
       filter: drop-shadow(0 0 calc(12px * var(--glow-intensity)) var(--cyan-glow));
     }
 
+    /* 円の内側のテキスト要素 */
     .timer-inner { 
       text-align: center; 
       z-index: 2; 
@@ -186,6 +205,7 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
+      pointer-events: none;
     }
 
     #time-display, .preview-timer {
@@ -195,7 +215,7 @@
       margin: 0;
       line-height: 1.1;
       letter-spacing: 0;
-      font-variant-numeric: tabular-nums;
+      font-variant-numeric: tabular-nums; /* 数字の幅を等幅にして等間隔でカウント表示 */
       font-feature-settings: "tnum";
       display: flex;
       justify-content: center;
@@ -269,7 +289,7 @@
       opacity: 0.95;
     }
 
-    /* 右側操作ボタンパネル */
+    /* 右側操作ボタンパネルのデザイン */
     .controls-panel {
       display: flex;
       flex-direction: column;
@@ -328,8 +348,10 @@
       color: #ff4d4d;
     }
 
+    /* 閲覧専用（サブ画面）モードの時に管理者ボタンを非表示にする設定 */
     .view-only-mode .admin-only { display: none !important; }
 
+    /* 保存時の通知メッセージ */
     .save-flash-notice {
       position: absolute;
       top: 50%;
@@ -351,6 +373,7 @@
       transition: opacity 0.3s ease;
     }
 
+    /* モーダル（ポップアップ画面）共通スタイル */
     .modal-overlay {
       position: fixed;
       top: 0; left: 0; width: 100vw; height: 100vh;
@@ -463,6 +486,7 @@
       align-items: center;
     }
 
+    /* 設定タブ（ブラインドリスト＋詳細編集）の左右2列レイアウト */
     .blinds-split-container {
       display: grid;
       grid-template-columns: 320px 1fr;
@@ -545,6 +569,7 @@
       padding-bottom: 0.5rem;
     }
 
+    /* デザインカスタム設定のカラーパレット・プレビュー */
     .design-container {
       display: flex;
       flex-direction: column;
@@ -688,6 +713,7 @@
       margin-bottom: 0.3rem;
     }
 
+    /* フォーム要素の統一スタイル */
     .form-group input, .form-group select {
       background: #1a212d;
       border: 1px solid var(--panel-border);
@@ -747,7 +773,7 @@
       gap: 0.5rem;
     }
 
-    /* SHARE URL モーダル専用スタイル */
+    /* 共有URL（QRコード）表示ポップアップ用スタイル */
     #qrcode-display img, #qrcode-display canvas {
       display: block;
       margin: 0 auto;
@@ -756,13 +782,16 @@
 </head>
 <body>
 
+<!-- メインの画面コンテナ -->
 <div class="timer-frame">
+  <!-- 設定適用時の通知ポップアップ -->
   <div class="save-flash-notice" id="flash-notice">PREVIEW APPLIED</div>
 
   <div class="main-section">
     <!-- 左側：トーナメント情報パネル -->
     <div class="panel">
       <div class="panel-header">TOURNAMENT INFO</div>
+      <!-- 残り人数 / 総エントリー数 -->
       <div class="info-item">
         <div class="info-label">Players Left:</div>
         <div class="info-value">
@@ -775,10 +804,12 @@
           <button class="btn-small admin-only" onclick="changeTotalEntries(-1)">-</button>
         </div>
       </div>
+      <!-- アベレージスタック表示 -->
       <div class="info-item">
         <div class="info-label">Avg Stack:</div>
         <div class="info-value" id="avg-stack-display" style="color: var(--gold-accent);">10,000</div>
       </div>
+      <!-- 次のブラインドレベル情報 -->
       <div class="info-item">
         <div class="info-label">NEXT BLIND:</div>
         <div class="info-value" id="next-blind-display" style="color: var(--gold-accent);">
@@ -786,25 +817,28 @@
           <div class="next-ante">ANTE 400</div>
         </div>
       </div>
+      <!-- 次の休憩時間までの残りカウントダウン -->
       <div class="info-item">
         <div class="info-label">NEXT BREAK:</div>
         <div class="info-value" id="next-break-display" style="color: var(--cyan-glow);">02:00:00</div>
       </div>
     </div>
 
-    <!-- 中央：タイマー領域 -->
+    <!-- 中央：タイマー領域（円内タップ/クリックでタイマーのスタート・一時停止を切り替え） -->
     <div class="timer-wrapper">
-      <div class="timer-container">
+      <div class="timer-container" onclick="toggleTimer()">
+        <!-- 円型プログレスバー -->
         <svg class="progress-ring" viewBox="-20 -20 330 330">
           <circle class="progress-ring__circle_bg" stroke-width="12" r="130" cx="145" cy="145"/>
           <circle class="progress-ring__circle_bar" stroke-width="12" r="130" cx="145" cy="145"/>
         </svg>
+        <!-- タイマーテキスト表示 -->
         <div class="timer-inner">
           <p id="level-display">LEVEL 1</p>
           <div id="time-display">
             <span class="time-part minutes" id="time-minutes">15</span><span class="time-colon">:</span><span class="time-part seconds" id="time-seconds">00</span>
           </div>
-          <!-- 2段分けブラインド表示領域（メインタイマー下・拡大版） -->
+          <!-- 現在のブラインド表示（SB / BB / ANTE） -->
           <div id="timer-blinds-display">
             <div id="timer-sb-bb">SB 1,000 / BB 2,000</div>
             <div id="timer-ante">ANTE 2,000</div>
@@ -813,7 +847,7 @@
       </div>
     </div>
 
-    <!-- 右側：システムボタン領域 -->
+    <!-- 右側：タイマー操作・設定ボタン領域 -->
     <div class="controls-panel">
       <button class="admin-only" id="start-stop-btn" onclick="toggleTimer()">START / PAUSE</button>
       <div class="btn-row">
@@ -827,7 +861,7 @@
   </div>
 </div>
 
-<!-- SETTINGS モーダル -->
+<!-- 【モーダル 1】SETTINGS (詳細設定モーダル) -->
 <div class="modal-overlay" id="settings-modal">
   <div class="modal-content">
     <div class="modal-header">
@@ -835,6 +869,7 @@
       <button onclick="closeSettings()" style="padding: 0.2rem 0.6rem; height: auto; width: auto;">✕</button>
     </div>
 
+    <!-- 設定切り替えタブ -->
     <div class="modal-tabs">
       <button class="tab-btn active" onclick="switchTab('blinds-tab')">ブラインド設定</button>
       <button class="tab-btn" onclick="switchTab('stack-tab')">スタック・進行設定</button>
@@ -842,7 +877,9 @@
     </div>
 
     <div class="tab-container">
+      <!-- タブ 1: ブラインド・ストラクチャー設定 -->
       <div id="blinds-tab" class="tab-content active">
+        <!-- プリセット選択・ファイル読み書きボタンバー -->
         <div class="preset-bar">
           <span style="font-size: 0.85rem; color: var(--text-sub);">プリセット:</span>
           <select id="preset-select" onchange="loadSelectedPreset()"></select>
@@ -858,6 +895,7 @@
           <span style="font-size: 0.8em; opacity: 0.8;">(プレイ時間 + BREAK時間)</span>
         </div>
 
+        <!-- 左右2分割（左：レベル一覧 / 右：選択中の詳細編集） -->
         <div class="blinds-split-container">
           <div class="blinds-list-panel">
             <div class="blinds-list-scroll" id="blinds-list-scroll"></div>
@@ -867,6 +905,7 @@
             </div>
           </div>
 
+          <!-- 詳細入力フォーム -->
           <div class="blind-detail-panel" id="blind-detail-panel">
             <div class="blind-detail-title" id="detail-title">LEVEL 1</div>
             
@@ -901,6 +940,7 @@
         </div>
       </div>
 
+      <!-- タブ 2: スタック・参加人数設定 -->
       <div id="stack-tab" class="tab-content">
         <div style="max-width: 360px; margin: 1rem auto 0 auto;">
           <div class="form-group">
@@ -914,8 +954,10 @@
         </div>
       </div>
 
+      <!-- タブ 3: デザイン・フォント設定 -->
       <div id="design-tab" class="tab-content">
         <div class="design-container">
+          <!-- デザイン変更のリアルタイムプレビュー -->
           <div class="preview-box">
             <div class="preview-label">REALTIME PREVIEW</div>
             <div class="preview-level" id="preview-level-text">LEVEL 1</div>
@@ -929,11 +971,13 @@
           </div>
 
           <div>
+            <!-- カラーパレット（全20色） -->
             <div class="form-group">
               <label>テーマカラーパレット（20色）</label>
               <div class="color-grid" id="color-palette"></div>
             </div>
 
+            <!-- タイマーフォントの切り替え選択 -->
             <div class="form-group" style="margin-top: 1.2rem;">
               <label>タイマー文字フォント (30種類)</label>
               <select id="setting-timer-font" onchange="updateLivePreview()">
@@ -970,6 +1014,7 @@
               </select>
             </div>
 
+            <!-- 発光（ネオンエフェクト）の調節 -->
             <div class="form-group">
               <label>
                 <span>ネオン発光の明るさ</span>
@@ -979,6 +1024,7 @@
             </div>
           </div>
 
+          <!-- 詳細なRGB/カラー指定（アコーディオン形式） -->
           <div class="accordion-section">
             <div class="accordion-header" onclick="toggleAccordion()">
               <span>アドバンスド カスタム設定 ⚙️（上級者用）</span>
@@ -1016,6 +1062,7 @@
       </div>
     </div>
 
+    <!-- モーダル下部（JSONデータ保存・読み込みおよび適用ボタン） -->
     <div class="modal-footer">
       <div class="backup-controls">
         <button class="btn-small" onclick="exportConfig()" title="設定全体をファイルに保存">JSON保存 📥</button>
@@ -1028,22 +1075,20 @@
   </div>
 </div>
 
-<!-- SHARE URL モーダル（QRコード・URLコピー表示） -->
+<!-- 【モーダル 2】SHARE URL (リアルタイム画面共有用ポップアップ) -->
 <div class="modal-overlay" id="share-modal">
   <div class="modal-content" style="width: 440px; height: auto; max-height: 90vh;">
-    <div class="modal-header">
-      <span>SHARE VIEWER URL 🔗</span>
+    <div class="modal-header" style="justify-content: flex-end;">
       <button onclick="closeShareModal()" style="padding: 0.2rem 0.6rem; height: auto; width: auto;">✕</button>
     </div>
     <div style="padding: 1.5rem 0 1rem 0; display: flex; flex-direction: column; align-items: center; gap: 1.2rem;">
-      <p style="font-size: 0.85rem; color: var(--text-sub); text-align: center;">スマートフォン等でスキャンすると画面をリアルタイム共有できます。</p>
       
-      <!-- QRコード描画エリア -->
+      <!-- 生成されたQRコードが挿入されるエリア -->
       <div id="qrcode-display" style="background: #ffffff; padding: 14px; border-radius: 12px; box-shadow: 0 0 20px rgba(20, 243, 255, 0.2);"></div>
       
-      <!-- URL コピー領域 -->
+      <!-- 共有用URLの表示とコピーボタン -->
       <div style="width: 100%; display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.5rem;">
-        <label style="font-size: 0.8rem; color: var(--text-sub);">共有用 URL</label>
+        <label style="font-size: 0.85rem; color: var(--text-sub);">共有用 URL</label>
         <div style="display: flex; gap: 0.5rem;">
           <input type="text" id="share-url-input" readonly style="flex: 1; background: #1a212d; border: 1px solid var(--panel-border); color: #fff; font-family: 'Shippori Mincho', serif; padding: 0.5rem; border-radius: 6px; font-size: 0.85rem; text-align: left;">
           <button onclick="copyShareUrl()" style="width: auto; padding: 0 1rem; font-size: 0.85rem; background: var(--cyan-dim); border-color: var(--cyan-glow); color: var(--cyan-glow); white-space: nowrap;">URLコピー 📋</button>
@@ -1055,22 +1100,28 @@
   </div>
 </div>
 
+<!-- JavaScript プログラム処理部 -->
 <script>
-  // 音声ファイルの指定・読み込み
-  const sound1min = new Audio('1min.mp3');
-  const soundCount = new Audio('count.mp3');
-  const soundLevelUp = new Audio('LevelUP.mp3');
+  // ==========================================
+  // 1. 効果音（SE）ファイルの読み込みと再生関数
+  // ==========================================
+  const sound1min = new Audio('1min.mp3');   // 残り1分時の警告音
+  const soundCount = new Audio('count.mp3');  // カウントダウン音（ラスト3秒）
+  const soundLevelUp = new Audio('LevelUP.mp3'); // レベルアップ（時間終了）音
 
+  // 安全に音声再生を実行するヘルパー関数
   function playSE(audio) {
     try {
-      audio.currentTime = 0;
+      audio.currentTime = 0; // 先頭に戻して再生
       audio.play().catch(e => console.log("SE Play Error:", e));
     } catch(e) {
       console.log("SE Exception:", e);
     }
   }
 
-  // デフォルト構造
+  // ==========================================
+  // 2. ブラインド構成・設定の初期データ
+  // ==========================================
   let presets = {
     'デフォルト (100-5000)': [
       { type: 'level', sb: 100, bb: 200, ante: 200, time: 15 },
@@ -1098,6 +1149,7 @@
     playersLeft: 10
   };
 
+  // テーマカラー定義 (20色)
   const themeColors = {
     cyan: { name: 'シアン', glow: '#14f3ff', rgb: [20, 243, 255] },
     gold: { name: 'ゴールド', glow: '#ffb703', rgb: [255, 183, 3] },
@@ -1131,6 +1183,7 @@
     subColor: '#7a8b9e'
   };
 
+  // タイマー状態を保持する変数
   let currentLevelIdx = 0;
   let timeLeft = structure[0].time * 60;
   let totalTime = timeLeft;
@@ -1139,11 +1192,12 @@
   let pausedTimeLeft = null;
   let lastPlayedSecond = null;
   let isRunning = false;
-  let isViewerMode = false;
+  let isViewerMode = false; // 共有用の閲覧モード判定
 
   let peer = null;
   let connections = [];
 
+  // DOM要素の取得
   const timeMinutesDisplay = document.getElementById('time-minutes');
   const timeSecondsDisplay = document.getElementById('time-seconds');
   const levelDisplay = document.getElementById('level-display');
@@ -1158,10 +1212,14 @@
   const nextBlindDisplay = document.getElementById('next-blind-display');
   const nextBreakDisplay = document.getElementById('next-break-display');
 
+  // 円の全周長を計算（ゲージのアニメーション計算用）
   const radius = circleBar.r.baseVal.value;
   const circumference = radius * 2 * Math.PI;
   circleBar.style.strokeDasharray = `${circumference} ${circumference}`;
 
+  // ==========================================
+  // 3. デザイン・カラーの反映処理
+  // ==========================================
   function applyDesign() {
     const glowHex = designConfig.customGlowHex || themeColors[designConfig.colorKey]?.glow || '#14f3ff';
     document.documentElement.style.setProperty('--cyan-glow', glowHex);
@@ -1176,6 +1234,7 @@
     if (prevBlind) prevBlind.style.color = designConfig.blindColor;
   }
 
+  // 16進数カラー（#ffffff等）をRGBA形式に変換
   function hexToRgba(hex, alpha) {
     let c = hex.replace('#', '');
     if (c.length === 3) c = c.split('').map(x => x + x).join('');
@@ -1197,6 +1256,7 @@
     }).join('');
   }
 
+  // カラーパレットの生成
   function initColorPalette() {
     const grid = document.getElementById('color-palette');
     grid.innerHTML = '';
@@ -1263,11 +1323,13 @@
     applyDesign();
   }
 
+  // 円形メーターのゲージ更新
   function setProgress(percent) {
     const offset = circumference * (1 - percent);
     circleBar.style.strokeDashoffset = offset;
   }
 
+  // レベル表記ラベルの作成（「LEVEL X」または「BREAK」）
   function getLevelLabel(idx, struct = structure) {
     let levelCount = 0;
     for (let i = 0; i <= idx; i++) {
@@ -1276,6 +1338,7 @@
     return struct[idx].type === 'break' ? 'BREAK' : `LEVEL ${levelCount}`;
   }
 
+  // ブラインドテキストの整形
   function formatBlindsSplit(item) {
     if (item.type === 'break') {
       return { line1: 'BREAK TIME', line2: '' };
@@ -1290,6 +1353,7 @@
     };
   }
 
+  // 総時間（プレイ時間＋休憩）の計算
   function calculateTotalStructureTime(struct = structure) {
     const totalMinutes = struct.reduce((acc, curr) => acc + (parseInt(curr.time) || 0), 0);
     const h = Math.floor(totalMinutes / 60);
@@ -1297,6 +1361,9 @@
     return h > 0 ? `${h}時間${m}分` : `${m}分`;
   }
 
+  // ==========================================
+  // 4. 画面テキスト・タイマーのメイン表示更新
+  // ==========================================
   function updateDisplay(exactTimeLeft = timeLeft) {
     const current = structure[currentLevelIdx] || structure[0];
     const displaySeconds = Math.ceil(exactTimeLeft);
@@ -1319,7 +1386,7 @@
     timerAnteDisplay.textContent = formatted.line2;
     timerAnteDisplay.style.display = formatted.line2 ? 'block' : 'none';
 
-    // スタック計算
+    // アベレージスタックのリアルタイム計算
     const totalChips = tournamentInfo.startStack * tournamentInfo.totalEntries;
     const avgStack = tournamentInfo.playersLeft > 0 ? Math.floor(totalChips / tournamentInfo.playersLeft) : 0;
 
@@ -1327,7 +1394,7 @@
     totalEntriesDisplay.textContent = tournamentInfo.totalEntries;
     avgStackDisplay.textContent = avgStack.toLocaleString();
 
-    // NEXT BLIND 表示更新 (2段組み表示対応)
+    // NEXT BLIND（次のブラインド）の表示更新
     if (currentLevelIdx < structure.length - 1) {
       const nextItem = structure[currentLevelIdx + 1];
       if (nextItem.type === 'break') {
@@ -1342,7 +1409,7 @@
       nextBlindDisplay.innerHTML = '<div>-</div>';
     }
 
-    // NEXT BREAK 表示更新（リアルタイムカウントダウン方式）
+    // NEXT BREAK（次の休憩までの時間）のリアルタイムカウントダウン計算
     let nextBreakIndex = -1;
     for (let i = currentLevelIdx; i < structure.length; i++) {
       if (structure[i].type === 'break') {
@@ -1375,6 +1442,7 @@
 
     setProgress(exactTimeLeft / totalTime);
 
+    // 管理者モードの場合、接続されている全子画面へ状態を送信
     if (!isViewerMode) {
       broadcastState();
     }
@@ -1401,10 +1469,14 @@
     }
   }
 
+  // ==========================================
+  // 5. 初期化とPeerJS（リアルタイム通信）の接続
+  // ==========================================
   window.addEventListener('DOMContentLoaded', () => {
     const params = new URLSearchParams(window.location.search);
     const hostId = params.get('host');
 
+    // URLパラメータに host ID があれば閲覧者モードとして起動
     if (hostId) {
       isViewerMode = true;
       document.body.classList.add('view-only-mode');
@@ -1426,6 +1498,7 @@
         });
       });
     } else {
+      // 親画面（管理者）として起動
       peer = new Peer();
       peer.on('connection', (conn) => {
         connections.push(conn);
@@ -1439,6 +1512,7 @@
     updateDisplay();
   });
 
+  // 全子画面（閲覧者）にデータ配信
   function broadcastState() {
     const state = { structure, tournamentInfo, currentLevelIdx, timeLeft, totalTime, designConfig };
     connections.forEach(conn => {
@@ -1446,6 +1520,9 @@
     });
   }
 
+  // ==========================================
+  // 6. タイマー進行処理 (requestAnimationFrame)
+  // ==========================================
   function tick(timestamp) {
     if (!startTime) startTime = timestamp;
     const elapsed = (timestamp - startTime) / 1000;
@@ -1453,6 +1530,7 @@
 
     timeLeft = Math.ceil(currentExactTimeLeft);
 
+    // 残り時間に応じた効果音の再生判定
     if (timeLeft !== lastPlayedSecond) {
       if (timeLeft === 60) {
         playSE(sound1min);
@@ -1467,11 +1545,13 @@
     if (currentExactTimeLeft > 0) {
       timerAnimationId = requestAnimationFrame(tick);
     } else {
+      // レベル終了時の処理
       cancelAnimationFrame(timerAnimationId);
       timerAnimationId = null;
 
       playSE(soundLevelUp);
 
+      // 自動で次のレベルへ移行
       if (currentLevelIdx < structure.length - 1) {
         currentLevelIdx++;
         timeLeft = structure[currentLevelIdx].time * 60;
@@ -1514,6 +1594,7 @@
     }
   }
 
+  // スタート / 一時停止の切替
   function toggleTimer() {
     if (isViewerMode) return;
 
@@ -1527,6 +1608,7 @@
     updateButton();
   }
 
+  // 指定レベルへのジャンプ
   function setLevel(idx) {
     if (isViewerMode) return;
     pauseTimer();
@@ -1550,6 +1632,9 @@
   function prevLevel() { if (currentLevelIdx > 0) setLevel(currentLevelIdx - 1); }
   function resetTimer() { setLevel(0); }
 
+  // ==========================================
+  // 7. 設定画面（モーダル）内の操作ロジック
+  // ==========================================
   function switchTab(tabId) {
     document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
@@ -1604,6 +1689,7 @@
     }
   }
 
+  // 設定パネルのレベル一覧の描画
   function renderBlindsList() {
     const container = document.getElementById('blinds-list-scroll');
     container.innerHTML = '';
@@ -1639,6 +1725,7 @@
     renderBlindsList();
   }
 
+  // ステップ数（100刻みか500刻みか）の自動計算
   function calculateStep(sbValue) {
     return (sbValue / 100 >= 20) ? 500 : 100;
   }
@@ -1658,6 +1745,7 @@
     }
   }
 
+  // レベル詳細編集パネルの描画・フォーム連動
   function renderDetailPanel() {
     if (editingStructure.length === 0) {
       document.getElementById('blind-detail-panel').style.display = 'none';
@@ -1690,6 +1778,7 @@
 
     document.getElementById('detail-time').value = item.time;
 
+    // SB変更時にBBとANTEを自動計算（SBの2倍）
     document.getElementById('detail-sb').oninput = (e) => {
       const sb = parseInt(e.target.value) || 0;
       item.sb = sb;
@@ -1799,6 +1888,7 @@
     }, 1500);
   }
 
+  // 設定の保存・適用
   function saveSettings() {
     presets[activePresetKey] = JSON.parse(JSON.stringify(editingStructure));
 
@@ -1825,6 +1915,9 @@
     }
   }
 
+  // ==========================================
+  // 8. ファイル入出力（JSONバックアップ & Excel）
+  // ==========================================
   function exportConfig() {
     presets[activePresetKey] = JSON.parse(JSON.stringify(editingStructure));
 
@@ -1879,6 +1972,7 @@
     event.target.value = '';
   }
 
+  // Excelファイル書き出し (SheetJS利用)
   function exportBlindsToExcel() {
     if (!editingStructure || editingStructure.length === 0) {
       alert('出力するブラインドデータがありません。');
@@ -1911,6 +2005,7 @@
     document.getElementById('excel-file-input').click();
   }
 
+  // Excelファイル読み込み
   function handleExcelImport(event) {
     const file = event.target.files[0];
     if (!file) return;
@@ -1980,7 +2075,9 @@
     event.target.value = '';
   }
 
-  // 閲覧用URL・QRコードモーダル表示機能
+  // ==========================================
+  // 9. 画面共有用URLとQRコードの生成機能
+  // ==========================================
   function generateViewerURL() {
     if (!peer || !peer.id) {
       alert('通信初期化中です。少々お待ちの上再度お試しください。');
@@ -1988,11 +2085,10 @@
     }
     const viewerURL = `${window.location.origin}${window.location.pathname}?host=${peer.id}`;
     
-    // URL入力フィールドに設定
     const shareInput = document.getElementById('share-url-input');
     shareInput.value = viewerURL;
 
-    // QRコード生成
+    // QRCode.js ライブラリを使ってQRコードを生成
     const qrDisplay = document.getElementById('qrcode-display');
     qrDisplay.innerHTML = '';
     new QRCode(qrDisplay, {
@@ -2004,7 +2100,6 @@
       correctLevel : QRCode.CorrectLevel.H
     });
 
-    // モーダル表示
     document.getElementById('share-modal').style.display = 'flex';
   }
 
@@ -2041,6 +2136,8 @@
     }, 2000);
   }
 </script>
+
+<!-- Service Workerの登録（オフライン動作対応用） -->
 <script>
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js');
